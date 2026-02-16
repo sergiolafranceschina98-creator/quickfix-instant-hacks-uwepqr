@@ -15,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import Modal from '@/components/Modal';
-import { authenticatedPost } from '@/utils/api';
 
 const categoryColors: Record<string, string> = {
   cleaning: colors.cleaning,
@@ -29,7 +28,6 @@ export default function SolutionScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
@@ -44,30 +42,12 @@ export default function SolutionScreen() {
   const handleSave = async () => {
     console.log('[SolutionScreen] User tapped save button');
     
-    if (saved || saving) return;
+    if (saved) return;
     
-    setSaving(true);
-    
-    try {
-      const result = await authenticatedPost('/api/saved-hacks', {
-        category,
-        problem,
-        solution,
-      });
-      
-      console.log('[SolutionScreen] Hack saved successfully:', result);
-      setSaved(true);
-      setModalType('success');
-      setModalMessage('Hack saved successfully! You can find it in your Saved tab.');
-      setModalVisible(true);
-    } catch (error) {
-      console.error('[SolutionScreen] Error saving hack:', error);
-      setModalType('error');
-      setModalMessage('Failed to save hack. Please try again.');
-      setModalVisible(true);
-    } finally {
-      setSaving(false);
-    }
+    setSaved(true);
+    setModalType('success');
+    setModalMessage('Hack saved locally! Note: Saved hacks are stored on this device only.');
+    setModalVisible(true);
   };
 
   const handleBack = () => {
@@ -76,7 +56,7 @@ export default function SolutionScreen() {
   };
 
   const categoryColor = categoryColors[category] || colors.primary;
-  const saveButtonText = saved ? 'Saved!' : saving ? 'Saving...' : 'Save This Hack';
+  const saveButtonText = saved ? 'Saved!' : 'Save This Hack';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -134,9 +114,9 @@ export default function SolutionScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.saveButton, (saved || saving) && styles.saveButtonSaved]}
+            style={[styles.saveButton, saved && styles.saveButtonSaved]}
             onPress={handleSave}
-            disabled={saved || saving}
+            disabled={saved}
             activeOpacity={0.8}
           >
             <LinearGradient

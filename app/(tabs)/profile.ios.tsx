@@ -12,9 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, commonStyles } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
 import Modal from '@/components/Modal';
-import { authenticatedGet, authenticatedDelete } from '@/utils/api';
 
 interface SavedHack {
   id: string;
@@ -33,34 +31,12 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
   const [savedHacks, setSavedHacks] = useState<SavedHack[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [hackToDelete, setHackToDelete] = useState<string | null>(null);
-  const [signOutModalVisible, setSignOutModalVisible] = useState(false);
 
   console.log('ProfileScreen rendered (iOS)');
-
-  useEffect(() => {
-    loadSavedHacks();
-  }, []);
-
-  const loadSavedHacks = async () => {
-    console.log('[ProfileScreen] Loading saved hacks');
-    setLoading(true);
-
-    try {
-      const hacks = await authenticatedGet<SavedHack[]>('/api/saved-hacks');
-      console.log('[ProfileScreen] Saved hacks loaded:', hacks);
-      setSavedHacks(hacks);
-    } catch (error) {
-      console.error('[ProfileScreen] Error loading saved hacks:', error);
-      setSavedHacks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDeleteHack = async (hackId: string) => {
     console.log('[ProfileScreen] User tapped delete for hack:', hackId);
@@ -72,25 +48,8 @@ export default function ProfileScreen() {
     if (!hackToDelete) return;
 
     console.log('[ProfileScreen] Deleting hack:', hackToDelete);
-    
-    try {
-      await authenticatedDelete(`/api/saved-hacks/${hackToDelete}`);
-      console.log('[ProfileScreen] Hack deleted successfully');
-      setSavedHacks((prev) => prev.filter((hack) => hack.id !== hackToDelete));
-    } catch (error) {
-      console.error('[ProfileScreen] Error deleting hack:', error);
-    } finally {
-      setHackToDelete(null);
-    }
-  };
-
-  const handleSignOut = () => {
-    setSignOutModalVisible(true);
-  };
-
-  const confirmSignOut = async () => {
-    console.log('[ProfileScreen] User signing out');
-    await signOut();
+    setSavedHacks((prev) => prev.filter((hack) => hack.id !== hackToDelete));
+    setHackToDelete(null);
   };
 
   const categoryColor = (category: string) => {
@@ -118,24 +77,7 @@ export default function ProfileScreen() {
                   Your favorite solutions for quick access
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.signOutButton}
-                onPress={handleSignOut}
-                activeOpacity={0.7}
-              >
-                <IconSymbol
-                  ios_icon_name="rectangle.portrait.and.arrow.right"
-                  android_material_icon_name="logout"
-                  size={24}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
             </View>
-            {user && (
-              <View style={styles.userInfo}>
-                <Text style={styles.userEmail}>{user.email}</Text>
-              </View>
-            )}
           </LinearGradient>
         </View>
 
@@ -229,17 +171,6 @@ export default function ProfileScreen() {
         onCancel={() => setHackToDelete(null)}
         onClose={() => setDeleteModalVisible(false)}
       />
-
-      <Modal
-        visible={signOutModalVisible}
-        title="Sign Out?"
-        message="Are you sure you want to sign out?"
-        type="info"
-        confirmText="Sign Out"
-        cancelText="Cancel"
-        onConfirm={confirmSignOut}
-        onClose={() => setSignOutModalVisible(false)}
-      />
     </SafeAreaView>
   );
 }
@@ -275,22 +206,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     opacity: 0.9,
-  },
-  signOutButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userInfo: {
-    marginTop: 8,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: colors.text,
-    opacity: 0.8,
   },
   content: {
     paddingHorizontal: 20,

@@ -1,7 +1,6 @@
 
 import 'react-native-reanimated';
 import { WidgetProvider } from '@/contexts/WidgetContext';
-import { AuthProvider } from '@/contexts/AuthContext';
 import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
@@ -54,32 +53,27 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <WidgetProvider>
-          <ThemeProvider value={QuickFixDarkTheme}>
-            <SystemBars style="light" />
-            <Stack
-              screenOptions={{
+      <WidgetProvider>
+        <ThemeProvider value={QuickFixDarkTheme}>
+          <SystemBars style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="solution"
+              options={{
+                presentation: 'card',
                 headerShown: false,
               }}
-            >
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
-              <Stack.Screen name="auth-popup" options={{ headerShown: false }} />
-              <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="solution"
-                options={{
-                  presentation: 'card',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="light" />
-          </ThemeProvider>
-        </WidgetProvider>
-      </AuthProvider>
+            />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="light" />
+        </ThemeProvider>
+      </WidgetProvider>
     </GestureHandlerRootView>
   );
 }
