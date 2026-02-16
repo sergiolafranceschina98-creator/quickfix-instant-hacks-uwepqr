@@ -8,38 +8,51 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { IconSymbol } from '@/components/IconSymbol';
 import { colors, commonStyles } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import { LinearGradient } from 'expo-linear-gradient';
 import Modal from '@/components/Modal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SavedHack {
   id: string;
   category: string;
   problem: string;
   solution: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
-const categoryColors: Record<string, string> = {
-  cleaning: colors.cleaning,
-  tech: colors.tech,
-  finance: colors.finance,
-  'life-hack': colors.lifeHack,
-  'text-simplification': colors.textSimplification,
-};
+const SAVED_HACKS_KEY = '@quickfix_saved_hacks';
 
 export default function ProfileScreen() {
   const [savedHacks, setSavedHacks] = useState<SavedHack[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [hackToDelete, setHackToDelete] = useState<string | null>(null);
 
-  console.log('ProfileScreen rendered');
+  useEffect(() => {
+    loadSavedHacks();
+  }, []);
 
-  const handleDeleteHack = async (hackId: string) => {
+  const loadSavedHacks = async () => {
+    console.log('[ProfileScreen] Loading saved hacks from AsyncStorage');
+    try {
+      const hacksJson = await AsyncStorage.getItem(SAVED_HACKS_KEY);
+      const hacks = hacksJson ? JSON.parse(hacksJson) : [];
+      console.log('[ProfileScreen] Loaded hacks:', hacks.length);
+      setSavedHacks(hacks);
+    } catch (error) {
+      console.error('[ProfileScreen] Failed to load saved hacks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteHack = (hackId: string) => {
     console.log('[ProfileScreen] User tapped delete for hack:', hackId);
     setHackToDelete(hackId);
     setDeleteModalVisible(true);
@@ -47,117 +60,162 @@ export default function ProfileScreen() {
 
   const confirmDelete = async () => {
     if (!hackToDelete) return;
-
-    console.log('[ProfileScreen] Deleting hack:', hackToDelete);
-    setSavedHacks((prev) => prev.filter((hack) => hack.id !== hackToDelete));
-    setHackToDelete(null);
+    
+    console.log('[ProfileScreen] Confirming delete for hack:', hackToDelete);
+    
+    try {
+      const updatedHacks = savedHacks.filter(hack => hack.id !== hackToDelete);
+      await AsyncStorage.setItem(SAVED_HACKS_KEY, JSON.stringify(updatedHacks));
+      setSavedHacks(updatedHacks);
+      console.log('[ProfileScreen] Hack deleted successfully');
+    } catch (error) {
+      console.error('[ProfileScreen] Failed to delete hack:', error);
+    } finally {
+      setDeleteModalVisible(false);
+      setHackToDelete(null);
+    }
   };
 
   const categoryColor = (category: string) => {
-    return categoryColors[category] || colors.primary;
+    const colors_map: Record<string, string> = {
+      cleaning: colors.cleaning,
+      tech: colors.tech,
+      finance: colors.finance,
+      'life-hack': colors.lifeHack,
+      'text-simplification': colors.textSimplification,
+    };
+    return colors_map[category] || colors.primary;
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    }
+    if (diffDays === 1) {
+      return 'Yesterday';
+    }
+    if (diffDays < 7) {
+      const daysText = `${diffDays} days ago`;
+      return daysText;
+    }
+    
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+    return formattedDate;
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading your saved hacks...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={commonStyles.safeArea} edges={['top']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradientHeader}
-          >
-            <View style={styles.headerTop}>
-              <View>
-                <Text style={styles.headerTitle}>Saved Hacks</Text>
-                <Text style={styles.headerSubtitle}>
-                  Your favorite solutions for quick access
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Saved Hacks</Text>
+        <Text style={styles.headerSubtitle}>
+          {savedHacks.length === 0 ? 'No saved hacks yet' : `${savedHacks.length} saved ${savedHacks.length === 1 ? 'hack' : 'hacks'}`}
+        </Text>
+      </View>
 
-        <View style={styles.content}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading your saved hacks...</Text>
-            </View>
-          ) : savedHacks.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconContainer}>
-                <IconSymbol
-                  android_material_icon_name="bookmark-border"
-                  size={64}
-                  color={colors.textTertiary}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>No saved hacks yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Save your favorite solutions for quick access anytime
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.hacksContainer}>
-              {savedHacks.map((hack, index) => {
-                const color = categoryColor(hack.category);
-                const dateText = new Date(hack.createdAt).toLocaleDateString();
-                
-                return (
-                  <View key={index} style={styles.hackCard}>
-                    <View style={styles.hackHeader}>
-                      <View
-                        style={[
-                          styles.categoryBadge,
-                          { backgroundColor: color + '20' },
-                        ]}
-                      >
-                        <Text style={[styles.categoryBadgeText, { color }]}>
-                          {hack.category}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteHack(hack.id)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <IconSymbol
-                          android_material_icon_name="delete"
-                          size={20}
-                          color={colors.textSecondary}
-                        />
-                      </TouchableOpacity>
+      {savedHacks.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <IconSymbol
+            android_material_icon_name="bookmark-border"
+            size={80}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.emptyTitle}>No Saved Hacks Yet</Text>
+          <Text style={styles.emptyText}>
+            When you save a hack, it will appear here for quick access
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {savedHacks.map((hack) => {
+            const color = categoryColor(hack.category);
+            const dateText = formatDate(hack.createdAt);
+            
+            return (
+              <View key={hack.id} style={styles.hackCard}>
+                <LinearGradient
+                  colors={[colors.card, colors.card]}
+                  style={styles.hackCardGradient}
+                >
+                  <View style={styles.hackHeader}>
+                    <View
+                      style={[
+                        styles.categoryBadge,
+                        { backgroundColor: color + '20' },
+                      ]}
+                    >
+                      <Text style={[styles.categoryBadgeText, { color }]}>
+                        {hack.category}
+                      </Text>
                     </View>
-                    <Text style={styles.hackProblem}>{hack.problem}</Text>
-                    <Text style={styles.hackSolution} numberOfLines={3}>
-                      {hack.solution}
-                    </Text>
-                    <Text style={styles.hackDate}>{dateText}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteHack(hack.id)}
+                      style={styles.deleteButton}
+                      activeOpacity={0.7}
+                    >
+                      <IconSymbol
+                        android_material_icon_name="delete"
+                        size={20}
+                        color={colors.error}
+                      />
+                    </TouchableOpacity>
                   </View>
-                );
-              })}
-            </View>
-          )}
 
-          <View style={styles.statsSection}>
-            <Text style={styles.statsSectionTitle}>Your Stats</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{savedHacks.length}</Text>
-                <Text style={styles.statLabel}>Saved Hacks</Text>
+                  <Text style={styles.hackProblem}>{hack.problem}</Text>
+
+                  {hack.imageUrl && (
+                    <View style={styles.hackImageContainer}>
+                      <Image
+                        source={{ uri: hack.imageUrl }}
+                        style={styles.hackImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  )}
+
+                  <Text style={styles.hackSolution} numberOfLines={3}>
+                    {hack.solution}
+                  </Text>
+
+                  <View style={styles.hackFooter}>
+                    <View style={styles.dateContainer}>
+                      <IconSymbol
+                        android_material_icon_name="schedule"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.dateText}>{dateText}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
               </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{savedHacks.length}</Text>
-                <Text style={styles.statLabel}>Problems Solved</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <Modal
         visible={deleteModalVisible}
@@ -167,95 +225,85 @@ export default function ProfileScreen() {
         confirmText="Delete"
         cancelText="Cancel"
         onConfirm={confirmDelete}
-        onCancel={() => setHackToDelete(null)}
-        onClose={() => setDeleteModalVisible(false)}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setHackToDelete(null);
+        }}
+        onClose={() => {
+          setDeleteModalVisible(false);
+          setHackToDelete(null);
+        }}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  container: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  gradientHeader: {
-    padding: 32,
-    paddingTop: Platform.OS === 'android' ? 48 : 32,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: colors.text,
-    opacity: 0.9,
-  },
-  content: {
-    paddingHorizontal: 20,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 16,
   },
   loadingText: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginTop: 16,
+  },
+  header: {
+    padding: 20,
+    paddingTop: Platform.OS === 'android' ? 48 : 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   emptyContainer: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.card,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
+    padding: 40,
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 8,
+    marginTop: 24,
+    marginBottom: 12,
   },
-  emptySubtitle: {
+  emptyText: {
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    lineHeight: 24,
   },
-  hacksContainer: {
-    marginBottom: 32,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
   },
   hackCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  hackCardGradient: {
+    padding: 20,
   },
   hackHeader: {
     flexDirection: 'row',
@@ -272,11 +320,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.error + '20',
+  },
   hackProblem: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  hackImageContainer: {
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  hackImage: {
+    width: '100%',
+    height: 150,
   },
   hackSolution: {
     fontSize: 14,
@@ -284,41 +349,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
-  hackDate: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  statsSection: {
-    marginTop: 16,
-  },
-  statsSectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  statsGrid: {
+  hackFooter: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 4,
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  statLabel: {
-    fontSize: 14,
+  dateText: {
+    fontSize: 12,
     color: colors.textSecondary,
-    textAlign: 'center',
   },
 });

@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import Modal from '@/components/Modal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const categoryColors: Record<string, string> = {
   cleaning: colors.cleaning,
@@ -24,6 +25,8 @@ const categoryColors: Record<string, string> = {
   'text-simplification': colors.textSimplification,
 };
 
+const SAVED_HACKS_KEY = '@quickfix_saved_hacks';
+
 export default function SolutionScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -31,6 +34,7 @@ export default function SolutionScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [saving, setSaving] = useState(false);
 
   const problem = params.problem as string;
   const category = params.category as string;
@@ -42,12 +46,40 @@ export default function SolutionScreen() {
   const handleSave = async () => {
     console.log('[SolutionScreen] User tapped save button');
     
-    if (saved) return;
+    if (saved || saving) return;
     
-    setSaved(true);
-    setModalType('success');
-    setModalMessage('Hack saved locally! Note: Saved hacks are stored on this device only.');
-    setModalVisible(true);
+    setSaving(true);
+    
+    try {
+      const existingHacksJson = await AsyncStorage.getItem(SAVED_HACKS_KEY);
+      const existingHacks = existingHacksJson ? JSON.parse(existingHacksJson) : [];
+      
+      const newHack = {
+        id: Date.now().toString(),
+        category,
+        problem,
+        solution,
+        imageUrl: imageUrl || null,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const updatedHacks = [newHack, ...existingHacks];
+      await AsyncStorage.setItem(SAVED_HACKS_KEY, JSON.stringify(updatedHacks));
+      
+      console.log('[SolutionScreen] Hack saved successfully', { hackId: newHack.id });
+      
+      setSaved(true);
+      setModalType('success');
+      setModalMessage('Hack saved successfully! You can view it in your profile.');
+      setModalVisible(true);
+    } catch (error) {
+      console.error('[SolutionScreen] Failed to save hack:', error);
+      setModalType('error');
+      setModalMessage('Failed to save hack. Please try again.');
+      setModalVisible(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleBack = () => {
@@ -56,7 +88,7 @@ export default function SolutionScreen() {
   };
 
   const categoryColor = categoryColors[category] || colors.primary;
-  const saveButtonText = saved ? 'Saved!' : 'Save This Hack';
+  const saveButtonText = saved ? 'Saved!' : saving ? 'Saving...' : 'Save This Hack';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -114,9 +146,9 @@ export default function SolutionScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.saveButton, saved && styles.saveButtonSaved]}
+            style={[styles.saveButton, (saved || saving) && styles.saveButtonSaved]}
             onPress={handleSave}
-            disabled={saved}
+            disabled={saved || saving}
             activeOpacity={0.8}
           >
             <LinearGradient
