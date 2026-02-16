@@ -15,6 +15,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { LinearGradient } from 'expo-linear-gradient';
 import Modal from '@/components/Modal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
 interface SavedHack {
   id: string;
@@ -28,6 +29,7 @@ interface SavedHack {
 const SAVED_HACKS_KEY = '@quickfix_saved_hacks';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [savedHacks, setSavedHacks] = useState<SavedHack[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -49,6 +51,19 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenHack = (hack: SavedHack) => {
+    console.log('[ProfileScreen] User tapped to open hack:', hack.id);
+    router.push({
+      pathname: '/solution',
+      params: {
+        category: hack.category,
+        problem: hack.problem,
+        solution: hack.solution,
+        image: hack.imageUrl || '',
+      },
+    });
   };
 
   const handleDeleteHack = (hackId: string) => {
@@ -155,7 +170,12 @@ export default function ProfileScreen() {
             const dateText = formatDate(hack.createdAt);
             
             return (
-              <View key={hack.id} style={styles.hackCard}>
+              <TouchableOpacity
+                key={hack.id}
+                style={styles.hackCard}
+                onPress={() => handleOpenHack(hack)}
+                activeOpacity={0.8}
+              >
                 <LinearGradient
                   colors={[colors.card, colors.card]}
                   style={styles.hackCardGradient}
@@ -172,7 +192,10 @@ export default function ProfileScreen() {
                       </Text>
                     </View>
                     <TouchableOpacity
-                      onPress={() => handleDeleteHack(hack.id)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteHack(hack.id);
+                      }}
                       style={styles.deleteButton}
                       activeOpacity={0.7}
                     >
@@ -211,9 +234,18 @@ export default function ProfileScreen() {
                       />
                       <Text style={styles.dateText}>{dateText}</Text>
                     </View>
+                    <View style={styles.openIndicator}>
+                      <Text style={styles.openText}>Tap to view</Text>
+                      <IconSymbol
+                        ios_icon_name="chevron.forward"
+                        android_material_icon_name="arrow-forward"
+                        size={16}
+                        color={colors.primary}
+                      />
+                    </View>
                   </View>
                 </LinearGradient>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </ScrollView>
@@ -366,5 +398,15 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  openIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  openText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
   },
 });
